@@ -75,27 +75,36 @@ export default async function ProfilePage({ params }: PageProps) {
 
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-white">
-              @{profile.username}
-            </h1>
+            <h1 className="text-2xl font-bold text-white">@{profile.username}</h1>
             <span className="text-xs font-mono uppercase tracking-wider px-2.5 py-1 rounded-full border border-white/10 text-white/40">
               {profile.role_type}
             </span>
+            {profile.is_verified_investor && (
+              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-400/20">
+                ✓ Verified Investor
+              </span>
+            )}
+            {isOwnProfile && (
+              <Link href="/profile/edit"
+                className="text-xs text-white/30 hover:text-white/60 font-mono border border-white/10 rounded-lg px-3 py-1 hover:border-white/20 transition-colors">
+                Edit profile
+              </Link>
+            )}
           </div>
-
           {profile.bio && (
-            <p className="text-white/50 text-sm mt-2 max-w-xl leading-relaxed">
-              {profile.bio}
-            </p>
+            <p className="text-white/50 text-sm mt-2 max-w-xl leading-relaxed">{profile.bio}</p>
           )}
-
-          <p className="text-xs text-white/20 font-mono mt-3">
-            Joined{" "}
-            {new Date(profile.created_at).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "long",
-            })}
-          </p>
+          <div className="flex items-center gap-4 mt-3">
+            <p className="text-xs text-white/20 font-mono">
+              Joined {new Date(profile.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long" })}
+            </p>
+            {profile.linkedin_url && (
+              <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-white/30 hover:text-white/60 font-mono transition-colors">
+                LinkedIn ↗
+              </a>
+            )}
+          </div>
         </div>
       </div>
 

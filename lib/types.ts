@@ -15,6 +15,8 @@ export interface Profile {
   username: string;
   bio: string | null;
   role_type: RoleType;
+  linkedin_url: string | null;
+  is_verified_investor: boolean;
   created_at: string;
 }
 
@@ -47,6 +49,14 @@ export interface Connection {
   investor_id: string;
   founder_id: string;
   status: ConnectionStatus;
+  created_at: string;
+}
+
+export interface Report {
+  id: string;
+  idea_id: string;
+  reporter_id: string;
+  reason: string;
   created_at: string;
 }
 
@@ -94,4 +104,9 @@ export interface IdeaWithFounder extends Idea {
 
 export interface RatingWithRater extends Rating {
   rater: Pick<Profile, "id" | "username">;
+}
+
+export interface ConnectionWithProfiles extends Connection {
+  investor: Pick<Profile, "id" | "username" | "is_verified_investor">;
+  founder: Pick<Profile, "id" | "username">;
 }

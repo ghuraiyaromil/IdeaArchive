@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import IdeaCard from "@/components/IdeaCard";
 import SortDropdown from "@/components/SortDropdown";
+import IndustryFilter from "@/components/IndustryFilter";
 import type { LeaderboardEntry } from "@/lib/types";
 import type { Metadata } from "next";
 
@@ -12,12 +13,7 @@ export const metadata: Metadata = {
 
 export const revalidate = 30;
 
-type SortKey =
-  | "composite"
-  | "market_size"
-  | "feasibility"
-  | "clarity"
-  | "rating_count";
+type SortKey = "composite" | "market_size" | "feasibility" | "clarity" | "rating_count";
 
 const SORT_COLUMN: Record<SortKey, keyof LeaderboardEntry> = {
   composite: "overall_composite_score",
@@ -32,27 +28,32 @@ function isValidSort(value: string): value is SortKey {
 }
 
 interface PageProps {
-  searchParams: { sort?: string };
+  searchParams: { sort?: string; industry?: string };
 }
 
 export default async function LeaderboardPage({ searchParams }: PageProps) {
   const rawSort = searchParams.sort ?? "composite";
   const sort: SortKey = isValidSort(rawSort) ? rawSort : "composite";
   const sortColumn = SORT_COLUMN[sort];
+  const industry = searchParams.industry ?? "";
 
   const supabase = createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("idea_leaderboard")
     .select("*")
     .order(sortColumn as string, { ascending: false });
 
+  if (industry && industry !== "All") {
+    query = query.eq("industry", industry);
+  }
+
+  const { data, error } = await query;
+
   if (error) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16">
-        <p className="text-rose-400 text-sm">
-          Failed to load leaderboard: {error.message}
-        </p>
+        <p className="text-rose-400 text-sm">Failed to load leaderboard: {error.message}</p>
       </div>
     );
   }
@@ -62,23 +63,32 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+      <div className="flex flex-col gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
           <p className="text-sm text-white/40 mt-1">
             {entries.length} rated {entries.length === 1 ? "idea" : "ideas"}
+            {industry && industry !== "All" ? ` in ${industry}` : ""}
+            {" "}· minimum 3 ratings to appear
           </p>
         </div>
-        <Suspense>
-          <SortDropdown current={sort} />
-        </Suspense>
+        <div className="flex flex-wrap items-center gap-3">
+          <Suspense>
+            <IndustryFilter current={industry} />
+          </Suspense>
+          <Suspense>
+            <SortDropdown current={sort} />
+          </Suspense>
+        </div>
       </div>
 
       {/* Grid */}
       {entries.length === 0 ? (
         <div className="text-center py-24 border border-white/5 rounded-xl">
           <p className="text-white/30 text-sm">
-            No rated ideas yet — be the first to submit and rate.
+            {industry && industry !== "All"
+              ? `No rated ideas in ${industry} yet.`
+              : "No ideas with 3+ ratings yet — be the first to rate."}
           </p>
         </div>
       ) : (

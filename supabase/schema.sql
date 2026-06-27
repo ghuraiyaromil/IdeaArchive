@@ -89,7 +89,7 @@ from ideas i
 join profiles p  on p.id = i.founder_id
 join ratings r   on r.idea_id = i.id
 group by i.id, i.title, i.industry, i.problem, i.visibility, i.founder_id, p.username
-having count(r.id) >= 1;
+having count(r.id) >= 3;
 
 -- ── ROW LEVEL SECURITY ────────────────────────────────────────
 
@@ -213,3 +213,64 @@ create trigger on_auth_user_created
 -- ── DONE ──────────────────────────────────────────────────────
 -- After running this script, verify in the Supabase Table Editor that
 -- all four tables exist and the idea_leaderboard view is present.
+
+-- ═══════════════════════════════════════════════════════════════
+--  IdeaArchive — Schema additions (run after initial schema)
+-- ═══════════════════════════════════════════════════════════════
+
+-- ── RAISE LEADERBOARD THRESHOLD ───────────────────────────────
+-- Re-run this view to require ≥3 ratings (anti-gaming)
+create or replace view idea_leaderboard as
+select
+  i.id                                         as idea_id,
+  i.title,
+  i.industry,
+  i.problem,
+  i.visibility,
+  i.founder_id,
+  p.username                                   as founder_username,
+  round(avg(r.market_size_score)::numeric, 2)  as avg_market_size,
+  round(avg(r.feasibility_score)::numeric, 2)  as avg_feasibility,
+  round(avg(r.clarity_score)::numeric, 2)      as avg_clarity,
+  round(
+    (avg(r.market_size_score) + avg(r.feasibility_score) + avg(r.clarity_score)) / 3.0,
+    2
+  )                                            as overall_composite_score,
+  count(r.id)                                  as rating_count
+from ideas i
+join profiles p  on p.id = i.founder_id
+join ratings r   on r.idea_id = i.id
+group by i.id, i.title, i.industry, i.problem, i.visibility, i.founder_id, p.username
+having count(r.id) >= 3;
+
+-- ── REPORTS TABLE ─────────────────────────────────────────────
+create table if not exists reports (
+  id          uuid primary key default uuid_generate_v4(),
+  idea_id     uuid not null references ideas(id) on delete cascade,
+  reporter_id uuid not null references profiles(id) on delete cascade,
+  reason      text not null,
+  created_at  timestamptz not null default now(),
+  unique (idea_id, reporter_id)
+);
+
+alter table reports enable row level security;
+
+create policy "Authenticated users can report ideas"
+  on reports for insert
+  with check (
+    auth.uid() = reporter_id
+    and not exists (
+      select 1 from ideas where id = idea_id and founder_id = auth.uid()
+    )
+  );
+
+create policy "Reporters can view their own reports"
+  on reports for select using (reporter_id = auth.uid());
+
+-- ── VERIFIED INVESTOR FIELD ───────────────────────────────────
+alter table profiles add column if not exists linkedin_url text;
+alter table profiles add column if not exists is_verified_investor boolean not null default false;
+
+-- ── SECURITY INVOKER ON VIEW ──────────────────────────────────
+-- Fixes Supabase security advisor CRITICAL warning
+alter view idea_leaderboard set (security_invoker = on);
